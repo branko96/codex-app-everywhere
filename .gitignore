@@ -1,0 +1,23 @@
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Codex Linux bundle
+codex-linux/node_modules/
+codex-linux/package-lock.json
+codex-linux/.vite/build/
+codex-linux/webview/assets/
+
+# DMG (too large)
+Codex-latest.dmg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo

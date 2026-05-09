@@ -1,0 +1,18 @@
+# LiteLLM configuration for Codex App
+# Translates OpenAI Responses API → Chat Completions (DeepSeek, etc.)
+#
+# Usage:
+#   litellm --config litellm-config.yaml --port 4001
+#
+model_list:
+  - model_name: deepseek-chat
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: deepseek-reasoner
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: os.environ/OPENAI_API_KEY
+
+general_settings:
+  disable_auth: true

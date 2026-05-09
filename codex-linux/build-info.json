@@ -1,0 +1,11 @@
+{
+  "generatedAt": "2026-05-06T23:18:46.561Z",
+  "codexAppVersion": "26.429.30905",
+  "codexAppBuild": "2345",
+  "electronRuntime": "41.2.0",
+  "mainEntry": ".vite/build/bootstrap.js",
+  "dmgPath": "/home/branko/Downloads/Codex-App-Linux-main/Codex-latest.dmg",
+  "dmgSha256": "b0c9ccab01491983c210d7252f4c66897b4156ce2d50bcdfe130b0a1e253b833",
+  "cliPath": "/home/branko/.nvm/versions/node/v20.19.6/bin/codex",
+  "cliVersion": "codex-cli 0.128.0"
+}
