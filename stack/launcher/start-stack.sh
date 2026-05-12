@@ -12,6 +12,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LITELLM_CONFIG="${SCRIPT_DIR}/../litellm/litellm-config.yaml"
 PROXY_SCRIPT="${SCRIPT_DIR}/../proxy/codex_proxy.py"
+VENV_DIR="$HOME/.codex/venv"
+PYTHON="${VENV_DIR}/bin/python3"
+LITELLM_BIN="${VENV_DIR}/bin/litellm"
 
 LITELLM_LOG="$HOME/.codex/litellm.log"
 PROXY_LOG="$HOME/.codex/proxy.log"
@@ -45,12 +48,19 @@ cleanup() {
 }
 
 check_deps() {
-    if ! command -v litellm &>/dev/null; then
-        err "LiteLLM no está instalado. Instálalo con: pip install litellm"
+    if [ ! -x "$PYTHON" ]; then
+        err "venv no encontrado en $VENV_DIR"
+        info "Crealo con: python3 -m venv ~/.codex/venv && ~/.codex/venv/bin/pip install litellm aiohttp"
         exit 1
     fi
-    if ! python3 -c "import aiohttp" &>/dev/null; then
-        err "aiohttp no está instalado. Instálalo con: pip install aiohttp"
+    if [ ! -x "$LITELLM_BIN" ]; then
+        err "LiteLLM no está instalado en el venv."
+        info "Instalalo con: ~/.codex/venv/bin/pip install litellm"
+        exit 1
+    fi
+    if ! "$PYTHON" -c "import aiohttp" &>/dev/null; then
+        err "aiohttp no está instalado en el venv."
+        info "Instalalo con: ~/.codex/venv/bin/pip install aiohttp"
         exit 1
     fi
 }
@@ -105,7 +115,7 @@ start_stack() {
         ok "LiteLLM ya está corriendo en puerto 4001"
     else
         info "Iniciando LiteLLM en puerto 4001..."
-        litellm --config "$LITELLM_CONFIG" --port 4001 >> "$LITELLM_LOG" 2>&1 &
+        "$LITELLM_BIN" --config "$LITELLM_CONFIG" --port 4001 >> "$LITELLM_LOG" 2>&1 &
         echo $! > "$LITELLM_PIDFILE"
         for i in $(seq 1 20); do
             sleep 0.5
@@ -125,7 +135,7 @@ start_stack() {
         ok "Proxy ya está corriendo en puerto 4000"
     else
         info "Iniciando proxy de filtro en puerto 4000..."
-        python3 "$PROXY_SCRIPT" >> "$PROXY_LOG" 2>&1 &
+        "$PYTHON" "$PROXY_SCRIPT" >> "$PROXY_LOG" 2>&1 &
         echo $! > "$PROXY_PIDFILE"
         for i in $(seq 1 20); do
             sleep 0.5
