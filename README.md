@@ -1,4 +1,4 @@
-# Codex App — Cross-Platform Proxy Stack 🐧🍎
+# Codex App — Cross-Platform Proxy Stack
 
 <p align="left">
   <img src="https://img.shields.io/badge/platform-linux_|_macos-2ea44f" alt="Linux & macOS" />
@@ -6,166 +6,208 @@
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License" />
 </p>
 
-Run Codex Desktop/CLI with **any LLM provider** (DeepSeek, Anthropic, etc.) via LiteLLM proxy instead of OpenAI.
+Run Codex Desktop/CLI with **DeepSeek V4** (flash & pro) via a local proxy stack instead of OpenAI.
 
-## 🚀 Quick Start
+## Architecture
 
-### macOS
-
-```bash
-# 1. Clone & install
-git clone https://github.com/your-user/codex-app-everywhere.git
-cd codex-app-everywhere
-./installers/mac/install-mac.sh
-
-# 2. Set your API key
-export OPENAI_API_KEY="sk-your-deepseek-key"
-
-# 3. Start everything
-./installers/mac/codex-mac-launcher.sh
+```
+Codex Desktop / Claude Code (compiled from source)
+      │
+      │  OPENAI_BASE_URL=http://localhost:4000/v1
+      ▼
+┌─────────────────────────────────────────────────┐
+│  codex_proxy.py (:4000)                         │
+│  - Model routing (gpt-5.x / o3 / o1 → DeepSeek) │
+│  - Responses API → Chat Completions conversion   │
+│  - reasoning_content injection (thinking mode)   │
+│  - Filters unsupported tool types                │
+└────────────────────┬────────────────────────────┘
+                     │
+┌────────────────────▼────────────────────────────┐
+│  LiteLLM (:4001)                                │
+│  - Routes to DeepSeek API                       │
+│  - Uses openai/ provider with custom base URL   │
+└────────────────────┬────────────────────────────┘
+                     │
+              DeepSeek API
+         deepseek-v4-flash / deepseek-v4-pro
 ```
 
-### Linux
+## Model Mapping
+
+| Codex UI selects | Routes to |
+|---|---|
+| `deepseek-v4-flash` | deepseek-v4-flash |
+| `deepseek-v4-pro` | deepseek-v4-pro |
+| `gpt-4o-mini`, `gpt-5.4-mini`, `gpt-5.5-mini` | deepseek-v4-flash |
+| `gpt-4o`, `gpt-5`, `gpt-5.4`, `gpt-5.5`, `o3`, `o1` | deepseek-v4-pro |
+
+---
+
+## Setup — macOS
+
+### 1. Prerequisites
 
 ```bash
-# 1. Clone & install (downloads/extracts from macOS DMG)
-git clone https://github.com/your-user/codex-app-everywhere.git
-cd codex-app-everywhere
-./install-codex-linux.sh          # Full install
-# or with local DMG
-./install-codex-linux.sh --dmg /path/to/Codex.dmg
-
-# 2. Launch (starts LiteLLM + proxy + Electron)
-export OPENAI_API_KEY="sk-your-deepseek-key"
-./installers/linux/codex-linux.sh
+python3 -m venv ~/.codex/venv
+~/.codex/venv/bin/pip install litellm aiohttp
 ```
 
-### Codex CLI (both platforms)
+### 2. Clone & configure
 
 ```bash
-# Just use the shared stack + CLI
+git clone https://github.com/branko96/codex-app-everywhere.git
+cd codex-app-everywhere
+```
+
+### 3. Export API key and start the stack
+
+```bash
+export DEEPSEEK_API_KEY=sk-your-deepseek-key
 ./stack/launcher/start-stack.sh
-export OPENAI_API_KEY="sk-your-deepseek-key"
-codex
 ```
 
-## 📁 Structure
+### 4. Point Codex / Claude Code at the proxy
+
+```bash
+export OPENAI_BASE_URL=http://localhost:4000/v1
+export OPENAI_API_KEY=dummy   # requerido por el cliente pero no validado
+```
+
+Then launch Codex or Claude Code normally. Select any model from the picker — they all route through the proxy.
+
+---
+
+## Setup — Linux (Claude Code compiled from source)
+
+### 1. Prerequisites
+
+```bash
+# Python venv
+python3 -m venv ~/.codex/venv
+~/.codex/venv/bin/pip install litellm aiohttp
+
+# Node.js 18+ and bun (for building Claude Code)
+# https://bun.sh/docs/installation
+```
+
+### 2. Clone the proxy stack
+
+```bash
+git clone https://github.com/branko96/codex-app-everywhere.git
+cd codex-app-everywhere
+```
+
+### 3. Start the stack
+
+```bash
+export DEEPSEEK_API_KEY=sk-your-deepseek-key
+./stack/launcher/start-stack.sh
+```
+
+Verify it's running:
+
+```bash
+./stack/launcher/start-stack.sh --status
+curl http://localhost:4000/v1/models
+```
+
+### 4. Build Claude Code from source (if not already built)
+
+```bash
+cd /path/to/claude-code-source
+bun install
+bun run build        # or whatever build command the repo uses
+```
+
+### 5. Launch Claude Code pointing at the proxy
+
+```bash
+export OPENAI_BASE_URL=http://localhost:4000/v1
+export OPENAI_API_KEY=dummy
+node /path/to/claude-code-source/cli.js
+# or if you have it installed globally:
+claude
+```
+
+### 6. Select your model
+
+In the Claude Code / Codex UI, open the model picker and select:
+- **`deepseek-v4-flash`** — fast, cheap, good for most tasks
+- **`deepseek-v4-pro`** — more capable, better reasoning
+
+Or any of the aliased names (`gpt-5.5`, `o3`, etc.).
+
+---
+
+## Stack management
+
+```bash
+# Start
+./stack/launcher/start-stack.sh
+
+# Stop
+./stack/launcher/start-stack.sh --stop
+
+# Status
+./stack/launcher/start-stack.sh --status
+
+# Logs
+tail -f ~/.codex/litellm.log
+tail -f ~/.codex/proxy.log
+```
+
+---
+
+## Environment variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `DEEPSEEK_API_KEY` | Yes | Your DeepSeek API key |
+| `OPENAI_BASE_URL` | Yes (client) | `http://localhost:4000/v1` |
+| `OPENAI_API_KEY` | Yes (client) | Any non-empty string (not validated) |
+| `LITELLM_URL` | No | LiteLLM upstream, default `http://localhost:4001` |
+| `PROXY_PORT` | No | Proxy listen port, default `4000` |
+
+---
+
+## Troubleshooting
+
+**`Authentication Fails (governor)`**
+LiteLLM started without `DEEPSEEK_API_KEY`. Stop everything and restart from a shell where the key is exported:
+```bash
+./stack/launcher/start-stack.sh --stop
+export DEEPSEEK_API_KEY=sk-...
+./stack/launcher/start-stack.sh
+```
+
+**Stack says "already running" but still fails**
+The start script skips restart if the port responds. Kill manually:
+```bash
+kill $(cat /tmp/codex-litellm.pid) $(cat /tmp/codex-proxy.pid) 2>/dev/null
+./stack/launcher/start-stack.sh
+```
+
+**`reasoning_content` error**
+The proxy injects `reasoning_content: ""` automatically on all assistant messages. If you see this error, the proxy version is outdated — pull master and restart.
+
+**`Invalid model name`**
+The model name sent by the UI isn't in the proxy's `MODEL_MAP`. Add it to `stack/proxy/codex_proxy.py` under `MODEL_MAP`.
+
+---
+
+## File structure
 
 ```
 codex-app-everywhere/
-├── stack/                          # 🔧 Shared proxy stack
-│   ├── litellm/litellm-config.yaml # LiteLLM model routing
-│   ├── proxy/codex_proxy.py        # Responses API → Chat Completions filter
-│   └── launcher/start-stack.sh     # Start/stop/status script
-├── installers/
-│   ├── linux/
-│   │   └── codex-linux.sh          # Linux launcher (Electron + stack)
-│   └── mac/
-│       ├── install-mac.sh          # macOS installer (patches Codex.app)
-│       └── codex-mac-launcher.sh   # macOS wrapper launcher
-├── install-codex-linux.sh          # Linux installer (DMG → Electron)
-├── codex-linux/                    # Built Linux bundle (after install)
-├── docs/
-│   └── ...                         # Detailed guides
-└── Reverse-engineering-guide.md    # How the ASAR extraction works
+├── stack/
+│   ├── litellm/
+│   │   └── litellm-config.yaml     # LiteLLM model definitions
+│   ├── proxy/
+│   │   └── codex_proxy.py          # Main proxy (Responses API ↔ Chat Completions)
+│   └── launcher/
+│       └── start-stack.sh          # Start / stop / status
+├── installers/                     # Platform-specific launchers
+├── install-codex-linux.sh          # Linux Codex Desktop installer
+└── README.md
 ```
-
-## 🔄 Architecture
-
-```
-Codex Desktop/CLI
-      │
-      ▼  Requests to api.openai.com
-┌─────────────────┐
-│  Proxy (:4000)  │  ← Filters unsupported tool types
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│  LiteLLM (:4001) │  ← Translates Responses API → Chat Completions
-└────────┬────────┘
-         │
-┌────────▼────────┐
-│  DeepSeek API   │  (or any LiteLLM-supported provider)
-└─────────────────┘
-```
-
-## ⚙️ Configuration
-
-### Models
-
-Edit `stack/litellm/litellm-config.yaml`:
-
-```yaml
-model_list:
-  - model_name: deepseek-chat
-    litellm_params:
-      model: deepseek/deepseek-chat
-      api_key: os.environ/OPENAI_API_KEY
-  - model_name: deepseek-reasoner
-    litellm_params:
-      model: deepseek/deepseek-reasoner
-      api_key: os.environ/OPENAI_API_KEY
-  # Add more providers/models
-  - model_name: claude-opus
-    litellm_params:
-      model: anthropic/claude-3-opus-20240229
-      api_key: os.environ/ANTHROPIC_API_KEY
-```
-
-### CLI config (`~/.codex/config.toml`)
-
-```toml
-model = "deepseek-chat"
-openai_base_url = "http://localhost:4000"
-model_reasoning_effort = "medium"
-```
-
-## 🛠 Requirements
-
-| Component | macOS | Linux |
-|-----------|-------|-------|
-| **Node.js** | ✅ v18+ | ✅ v18+ |
-| **Python 3** | ✅ pip | ✅ pip |
-| **Codex Desktop** | ✅ /Applications/Codex.app | ❌ (comes from DMG) |
-| **Codex CLI** | ✅ npm i -g @openai/codex | ✅ auto-installed |
-| **liteLLM** | ✅ pip install litellm | ✅ pip install litellm |
-| **aiohttp** | ✅ pip install aiohttp | ✅ pip install aiohttp |
-
-## 💰 Why?
-
-Avoid OpenAI's $200/month Pro plan. Run Codex with cost-effective providers:
-
-| Provider | ~Cost/month | vs ChatGPT Pro |
-|----------|-------------|----------------|
-| **OpenAI (default)** | $200 | — |
-| **DeepSeek V3** | ~$5–15 | **~95% cheaper** |
-| **DeepSeek R1** | ~$10–30 | **~85% cheaper** |
-| **Claude Opus** | ~$30–60 | **~70% cheaper** |
-
-## 🧹 Uninstall
-
-### macOS
-
-```bash
-./installers/mac/install-mac.sh --uninstall
-```
-
-### Linux
-
-```bash
-rm -rf codex-linux/
-# App was never installed system-wide
-```
-
-## ⚠️ Caveats
-
-- **macOS**: Each Codex Desktop update overwrites the patched `app.asar`. Re-run `install-mac.sh` after updates.
-- **macOS SIP**: You may need to disable SIP or use a self-signed certificate for the patched app.
-- **Function calls**: Some Responses API features (`web_search`, `namespace` tools) are filtered by the proxy.
-- **Streaming**: WebSocket may have issues — CLI mode is more reliable.
-
-## 🔗 Related
-
-- [Codex App Linux (original repo)](https://github.com/areu01or00/Codex-App-Linux)
-- [LiteLLM](https://github.com/BerriAI/litellm)
-- [OpenAI Codex](https://codex.ai/)
